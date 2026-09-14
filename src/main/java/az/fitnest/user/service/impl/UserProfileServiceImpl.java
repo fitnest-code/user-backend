@@ -590,14 +590,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("error.file_required");
         }
-        long maxSize = 5 * 1024 * 1024;
-        if (file.getSize() > maxSize) {
-            throw new BadRequestException("error.file_size_limit");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new BadRequestException("error.only_images_allowed");
-        }
     }
 
     private void checkSetupNotRequired() {

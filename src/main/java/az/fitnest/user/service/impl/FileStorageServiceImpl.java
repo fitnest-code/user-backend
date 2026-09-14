@@ -1,23 +1,16 @@
 package az.fitnest.user.service.impl;
 
 import az.fitnest.user.exception.BadRequestException;
+import io.grpc.StatusRuntimeException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class FileStorageServiceImpl implements az.fitnest.user.service.FileStorageService {
-
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
-
-    private static final List<String> ALLOWED_CONTENT_TYPES = Arrays.asList(
-            "image/jpeg", "image/jpg", "image/png", "image/webp", "image/svg+xml"
-    );
 
     private final az.fitnest.user.client.StorageGrpcClient storageGrpcClient;
 
@@ -37,8 +30,6 @@ public class FileStorageServiceImpl implements az.fitnest.user.service.FileStora
             return null;
         }
 
-        validateFile(file);
-
         try {
             String extractedOldPath = extractIdFromUrl(oldPath);
             az.fitnest.user.dto.response.StorageFileData data = storageGrpcClient.uploadFile(file, directory, extractedOldPath);
@@ -46,21 +37,7 @@ public class FileStorageServiceImpl implements az.fitnest.user.service.FileStora
         } catch (az.fitnest.user.exception.InternalServerException | az.fitnest.user.exception.BadRequestException e) {
             throw e;
         } catch (Exception e) {
-            throw new BadRequestException("error.file_upload_failed");
-        }
-    }
-
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("error.file_empty");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            throw new BadRequestException("error.invalid_file_type");
-        }
-
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BadRequestException("error.file_too_large");
+            throw mapUploadError(e);
         }
     }
 
@@ -98,5 +75,20 @@ public class FileStorageServiceImpl implements az.fitnest.user.service.FileStora
             return parts[parts.length - 1];
         }
         return url;
+    }
+
+    private static BadRequestException mapUploadError(Exception e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof StatusRuntimeException sre) {
+                String desc = sre.getStatus().getDescription();
+                if ("error.file_too_large".equals(desc)) {
+                    return new BadRequestException("error.file_size_limit");
+                }
+                if ("error.invalid_file_type".equals(desc)) {
+                    return new BadRequestException("error.only_images_allowed");
+                }
+            }
+        }
+        return new BadRequestException("error.file_upload_failed");
     }
 }

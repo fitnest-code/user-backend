@@ -26,6 +26,11 @@ spring:
     encoding: UTF-8
   application:
     name: user-backend   # ✅ Changed from user-service
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+      enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}

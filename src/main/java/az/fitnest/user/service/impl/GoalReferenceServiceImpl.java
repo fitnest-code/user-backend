@@ -172,10 +172,6 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     private void validateImage(MultipartFile file) {
         if (file == null || file.isEmpty()) throw new BadRequestException("error.file_required");
-        if (file.getSize() > 5 * 1024 * 1024) throw new BadRequestException("error.file_size_limit");
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/"))
-            throw new BadRequestException("error.only_images_allowed");
     }
 
     private void createTranslationIfNotFound(String goalCode, String languageCode, String title, String subtitle) {
