@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package fitnest.payment;
+
+option java_package = "az.fitnest.payment.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "PaymentProto";
+
+service PaymentService {
+  rpc CreatePayment (CreatePaymentRequest) returns (CreatePaymentResponse);
+  rpc PayWithCard (PayWithCardRequest) returns (PayWithCardResponse);
+  rpc GetUserCards (GetUserCardsRequest) returns (GetUserCardsResponse);
+  rpc GetCoinWallet (GetCoinWalletRequest) returns (GetCoinWalletResponse);
+}
+
+message GetCoinWalletRequest {
+  int64 user_id = 1;
+}
+
+message GetCoinWalletResponse {
+  string coin_balance = 1;
+  string azn_equivalent = 2;
+  string validity_date = 3; // ISO-8601 local datetime, empty if none
+}
+
+message PayWithCardRequest {
+  int64 user_id = 1;
+  string card_id = 2;
+  int64 package_id = 3;
+  int64 option_id = 4;
+}
+
+message PayWithCardResponse {
+  string status = 1;
+  string transaction_id = 2;
+  string message = 3;
+}
+
+message GetUserCardsRequest {
+  int64 user_id = 1;
+}
+
+message UserCardDto {
+  string card_id = 1;
+  string card_mask = 2;
+  string card_name = 3;
+  string brand = 4;
+}
+
+message GetUserCardsResponse {
+  repeated UserCardDto cards = 1;
+}
+
+message CreatePaymentRequest {
+  string order_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string description = 4;
+  string language = 5;
+  int32 is_installment = 6;
+  int32 refund = 7;
+  repeated string other_attr = 10;
+}
+
+message CreatePaymentResponse {
+  string status = 1;
+  string redirect_url = 2;
+  string transaction_id = 3;
+  string message = 4;
+}

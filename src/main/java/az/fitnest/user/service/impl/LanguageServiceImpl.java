@@ -42,8 +42,12 @@ public class LanguageServiceImpl implements LanguageService {
     @Transactional
     @Override
     public LanguageDto createLanguage(LanguageCreateRequest request) {
+        String code = request.code().toUpperCase();
+        if (languageRepository.existsByCode(code)) {
+            throw new BadRequestException("error.resource_already_exists");
+        }
         Language language = Language.builder()
-                .code(request.code().toUpperCase())
+                .code(code)
                 .build();
         language = languageRepository.save(language);
         return toDto(language);

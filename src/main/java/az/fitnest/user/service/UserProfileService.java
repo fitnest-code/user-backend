@@ -12,6 +12,8 @@ public interface UserProfileService {
 
     UserProfileResponse getUserMe();
 
+    UserProfileV2Response getUserMeV2();
+
     LocationResponse updateMyLocation(UpdateLocationRequest request);
 
     void updateBody(UpdateBodyRequest request);

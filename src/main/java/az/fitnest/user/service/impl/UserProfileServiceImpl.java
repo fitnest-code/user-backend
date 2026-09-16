@@ -47,6 +47,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final az.fitnest.user.client.StorageGrpcClient storageGrpcClient;
     private final CatalogGrpcClient catalogGrpcClient;
     private final OrderGrpcClient orderGrpcClient;
+    private final az.fitnest.user.client.PaymentCoinGrpcClient paymentCoinGrpcClient;
     private final LanguageService languageService;
     private final org.springframework.context.MessageSource messageSource;
     private final az.fitnest.user.client.NotificationsGrpcClient notificationsGrpcClient;
@@ -133,6 +134,20 @@ public class UserProfileServiceImpl implements UserProfileService {
         Boolean notificationsEnabled = notificationsGrpcClient.getUserDeviceNotificationEnabled(userId);
         logger.debug("UserProfileResponse for userId={}: currentSubscription={}, subscriptionStatus={}, notificationsEnabled={}", userId, currentSubscription, subscriptionStatus, notificationsEnabled);
         return UserProfileMapper.toUserProfileResponse(identityUser, profile, profileImageUrl, currentSubscription, subscriptionStatus, notificationsEnabled);
+    }
+
+    @Override
+    public UserProfileV2Response getUserMeV2() {
+        UserProfileResponse profile = getUserMe();
+        Long userId = UserContext.getCurrentUserId();
+        az.fitnest.user.client.PaymentCoinGrpcClient.CoinWalletSnapshot coins;
+        try {
+            coins = paymentCoinGrpcClient.getCoinWallet(userId);
+        } catch (Exception e) {
+            logger.warn("Failed to fetch coin wallet for userId={}: {}", userId, e.getMessage());
+            coins = az.fitnest.user.client.PaymentCoinGrpcClient.CoinWalletSnapshot.empty();
+        }
+        return UserProfileV2Response.from(profile, coins.coinBalance(), coins.aznEquivalent(), coins.validityDate());
     }
 
     private UserProfile getOrCreateProfile(Long userId) {

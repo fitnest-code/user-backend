@@ -161,7 +161,7 @@ app:
     enabled: ${APP_WARMUP_ENABLED:true}
     db: ${APP_WARMUP_DB:true}
     jwks: ${APP_WARMUP_JWKS:true}
-  base-url: https://api.fitnest.az
+  base-url: ${APP_BASE_URL:https://api.fitnest.az}
 
 springdoc:
   server-url: ${SPRINGDOC_SERVER_URL:https://api.fitnest.az}
@@ -229,3 +229,10 @@ grpc:
     catalog-backend:
       address: ${CATALOG_BACKEND_GRPC_ADDRESS:dns:///catalog-backend:9090}
       negotiation-type: plaintext
+    payment-backend:
+      address: ${PAYMENT_BACKEND_GRPC_ADDRESS:dns:///payment-backend:9090}
+      negotiation-type: plaintext
+      deadline-after: 5s
+      enable-keep-alive: true
+      keep-alive-time: 30s
+      keep-alive-timeout: 5s
