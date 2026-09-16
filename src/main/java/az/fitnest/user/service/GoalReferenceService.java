@@ -12,6 +12,10 @@ public interface GoalReferenceService {
 
     GoalItemResponse getGoalByCode(String code);
 
+    List<GoalItemResponse> getPublicGoals(String language);
+
+    GoalItemResponse getPublicGoalByCode(String code, String language);
+
     StreamingResponseBody streamGoalImage(String fsId);
 
     GoalReference createGoal(String code, String title, String subtitle, MultipartFile image);

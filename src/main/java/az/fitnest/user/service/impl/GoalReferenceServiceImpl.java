@@ -52,6 +52,22 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     }
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(value = "public-goals-all", key = "#root.target.resolvePublicLanguage(#language)")
+    public List<GoalItemResponse> getPublicGoals(String language) {
+        String publicLanguage = resolvePublicLanguage(language);
+        List<GoalReference> goals = goalReferenceRepository.findAllByOrderByGoalCodeAsc();
+        return goals.stream().map(goal -> mapPublicResponse(goal, publicLanguage)).collect(Collectors.toList());
+    }
+
+    @Override
+    @org.springframework.cache.annotation.Cacheable(value = "public-goal-by-code", key = "{#code, #root.target.resolvePublicLanguage(#language)}")
+    public GoalItemResponse getPublicGoalByCode(String code, String language) {
+        GoalReference goal = goalReferenceRepository.findById(code)
+                .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
+        return mapPublicResponse(goal, resolvePublicLanguage(language));
+    }
+
+    @Override
     public StreamingResponseBody streamGoalImage(String fsId) {
         return outputStream -> {
             storageGrpcClient.downloadFile(fsId, response -> {
@@ -71,7 +87,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public GoalReference createGoal(String code, String title, String subtitle, MultipartFile image) {
         if (goalReferenceRepository.existsById(code)) {
             throw new ConflictException("error.resource_already_exists");
@@ -97,7 +113,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public GoalReference updateGoal(String code, String title, String subtitle, MultipartFile image) {
         GoalReference goal = goalReferenceRepository.findById(code)
                 .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
@@ -121,7 +137,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public void deleteGoal(String code) {
         GoalReference goal = goalReferenceRepository.findById(code)
                 .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
@@ -150,6 +166,16 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
                 .title(title)
                 .subtitle(subtitle)
                 .imageUrl(getFullImageUrl(goal.getImageUrl()))
+                .build();
+    }
+
+    private GoalItemResponse mapPublicResponse(GoalReference goal, String language) {
+        GoalItemResponse item = mapToResponse(goal, language);
+        return GoalItemResponse.builder()
+                .code(item.code())
+                .title(item.title())
+                .subtitle(item.subtitle())
+                .imageUrl(getPublicImageUrl(item.imageUrl()))
                 .build();
     }
 
@@ -187,8 +213,32 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
         }
     }
 
+    public String resolvePublicLanguage(String requestedLanguage) {
+        String explicit = normalizeLanguage(requestedLanguage);
+        if (explicit != null) {
+            return explicit;
+        }
+        return resolveRequestLanguage();
+    }
+
     public String resolveLanguageForCache() {
         return getUserLanguage();
+    }
+
+    private String normalizeLanguage(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String token = value.trim().split("[,;]")[0].trim();
+        int separator = Math.max(token.indexOf('-'), token.indexOf('_'));
+        String code = separator > 0 ? token.substring(0, separator) : token;
+        if (code.length() >= 2) {
+            String lang = code.substring(0, 2).toUpperCase();
+            if (lang.equals("EN") || lang.equals("RU") || lang.equals("AZ")) {
+                return lang;
+            }
+        }
+        return null;
     }
 
     private String getUserLanguage() {
@@ -213,13 +263,6 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
                         ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
                 String acceptLanguage = request.getHeader("Accept-Language");
                 if (acceptLanguage != null && !acceptLanguage.trim().isEmpty()) {
-                    String raw = acceptLanguage.trim().split("[,;]")[0].trim();
-                    if (raw.length() >= 2) {
-                        String headerLang = raw.substring(0, 2).toUpperCase();
-                        if (headerLang.equals("EN") || headerLang.equals("RU") || headerLang.equals("AZ")) {
-                            return headerLang;
-                        }
-                    }
                     String localeLang = org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage()
                             .toUpperCase();
                     if (localeLang.equals("EN") || localeLang.equals("RU") || localeLang.equals("AZ")) {
@@ -231,6 +274,38 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
         }
 
         return "AZ";
+    }
+
+    private String resolveRequestLanguage() {
+        try {
+            org.springframework.web.context.request.RequestAttributes requestAttributes =
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
+                jakarta.servlet.http.HttpServletRequest request =
+                        ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
+                String fromHeader = normalizeLanguage(request.getHeader("Accept-Language"));
+                if (fromHeader != null) {
+                    return fromHeader;
+                }
+                String localeLang = normalizeLanguage(
+                        org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage());
+                if (localeLang != null) {
+                    return localeLang;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return "AZ";
+    }
+
+    private String getPublicImageUrl(String imageUrl) {
+        String full = getFullImageUrl(imageUrl);
+        if (full == null) return null;
+        if (full.startsWith("/api/v1/goals/images/")) {
+            return "/api/v1/public/landing/goals/images/" + full.substring("/api/v1/goals/images/".length());
+        }
+        return full;
     }
 
     private String getFullImageUrl(String fsId) {

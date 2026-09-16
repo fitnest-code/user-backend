@@ -38,7 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/translations/**", "/api/v1/languages/**").permitAll()
                         .requestMatchers("/api/v1/bmi/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/goals", "/api/v1/goals/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/public/landing/goals", "/api/v1/public/landing/goals/**").permitAll()
                         .requestMatchers("/api/v1/goals/images/**").permitAll()
                         .requestMatchers("/api/v1/me/profile/images/**").permitAll()
                         .requestMatchers("/actuator/**", "/health/**").permitAll()
