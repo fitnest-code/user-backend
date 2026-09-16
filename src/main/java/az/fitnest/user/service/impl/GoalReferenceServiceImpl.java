@@ -213,6 +213,13 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
                         ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
                 String acceptLanguage = request.getHeader("Accept-Language");
                 if (acceptLanguage != null && !acceptLanguage.trim().isEmpty()) {
+                    String raw = acceptLanguage.trim().split("[,;]")[0].trim();
+                    if (raw.length() >= 2) {
+                        String headerLang = raw.substring(0, 2).toUpperCase();
+                        if (headerLang.equals("EN") || headerLang.equals("RU") || headerLang.equals("AZ")) {
+                            return headerLang;
+                        }
+                    }
                     String localeLang = org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage()
                             .toUpperCase();
                     if (localeLang.equals("EN") || localeLang.equals("RU") || localeLang.equals("AZ")) {
