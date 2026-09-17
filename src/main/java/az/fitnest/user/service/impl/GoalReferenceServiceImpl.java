@@ -52,26 +52,46 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     }
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(value = "public-goals-all", key = "#root.target.resolvePublicLanguage(#language)")
+    public List<GoalItemResponse> getPublicGoals(String language) {
+        String publicLanguage = resolvePublicLanguage(language);
+        List<GoalReference> goals = goalReferenceRepository.findAllByOrderByGoalCodeAsc();
+        return goals.stream().map(goal -> mapPublicResponse(goal, publicLanguage)).collect(Collectors.toList());
+    }
+
+    @Override
+    @org.springframework.cache.annotation.Cacheable(value = "public-goal-by-code", key = "{#code, #root.target.resolvePublicLanguage(#language)}")
+    public GoalItemResponse getPublicGoalByCode(String code, String language) {
+        GoalReference goal = goalReferenceRepository.findById(code)
+                .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
+        return mapPublicResponse(goal, resolvePublicLanguage(language));
+    }
+
+    @Override
     public StreamingResponseBody streamGoalImage(String fsId) {
         return outputStream -> {
-            storageGrpcClient.downloadFile(fsId, response -> {
-                if (response.hasFileData()) {
-                    try {
-                        outputStream.write(response.getFileData().toByteArray());
-                    } catch (IOException e) {
-                    }
-                }
-            });
-            try {
-                outputStream.flush();
-            } catch (IOException e) {
-            }
+            outputStream.write(downloadGoalImage(fsId));
+            outputStream.flush();
         };
+    }
+
+    @Override
+    public byte[] downloadGoalImage(String fsId) {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        storageGrpcClient.downloadFile(fsId, response -> {
+            if (response.hasFileData()) {
+                try {
+                    buffer.write(response.getFileData().toByteArray());
+                } catch (IOException e) {
+                }
+            }
+        });
+        return buffer.toByteArray();
     }
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public GoalReference createGoal(String code, String title, String subtitle, MultipartFile image) {
         if (goalReferenceRepository.existsById(code)) {
             throw new ConflictException("error.resource_already_exists");
@@ -97,7 +117,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public GoalReference updateGoal(String code, String title, String subtitle, MultipartFile image) {
         GoalReference goal = goalReferenceRepository.findById(code)
                 .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
@@ -121,7 +141,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
     @Transactional
     @Override
-    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code"}, allEntries = true)
+    @org.springframework.cache.annotation.CacheEvict(value = {"goals-all", "goal-by-code", "public-goals-all", "public-goal-by-code"}, allEntries = true)
     public void deleteGoal(String code) {
         GoalReference goal = goalReferenceRepository.findById(code)
                 .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
@@ -150,6 +170,16 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
                 .title(title)
                 .subtitle(subtitle)
                 .imageUrl(getFullImageUrl(goal.getImageUrl()))
+                .build();
+    }
+
+    private GoalItemResponse mapPublicResponse(GoalReference goal, String language) {
+        GoalItemResponse item = mapToResponse(goal, language);
+        return GoalItemResponse.builder()
+                .code(item.code())
+                .title(item.title())
+                .subtitle(item.subtitle())
+                .imageUrl(getPublicImageUrl(item.imageUrl()))
                 .build();
     }
 
@@ -183,8 +213,32 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
         }
     }
 
+    public String resolvePublicLanguage(String requestedLanguage) {
+        String explicit = normalizeLanguage(requestedLanguage);
+        if (explicit != null) {
+            return explicit;
+        }
+        return resolveRequestLanguage();
+    }
+
     public String resolveLanguageForCache() {
         return getUserLanguage();
+    }
+
+    private String normalizeLanguage(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String token = value.trim().split("[,;]")[0].trim();
+        int separator = Math.max(token.indexOf('-'), token.indexOf('_'));
+        String code = separator > 0 ? token.substring(0, separator) : token;
+        if (code.length() >= 2) {
+            String lang = code.substring(0, 2).toUpperCase();
+            if (lang.equals("EN") || lang.equals("RU") || lang.equals("AZ")) {
+                return lang;
+            }
+        }
+        return null;
     }
 
     private String getUserLanguage() {
@@ -222,9 +276,66 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
         return "AZ";
     }
 
+    private String resolveRequestLanguage() {
+        try {
+            org.springframework.web.context.request.RequestAttributes requestAttributes =
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
+                jakarta.servlet.http.HttpServletRequest request =
+                        ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
+                String fromHeader = normalizeLanguage(request.getHeader("Accept-Language"));
+                if (fromHeader != null) {
+                    return fromHeader;
+                }
+                String localeLang = normalizeLanguage(
+                        org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage());
+                if (localeLang != null) {
+                    return localeLang;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return "AZ";
+    }
+
+    private String getPublicImageUrl(String imageUrl) {
+        String full = getFullImageUrl(imageUrl);
+        if (full == null) return null;
+        String fileId = extractGoalImageId(full);
+        if (fileId != null) {
+            return "/api/v1/public/landing/goals/images/" + fileId;
+        }
+        return full;
+    }
+
     private String getFullImageUrl(String fsId) {
         if (fsId == null || fsId.trim().isEmpty()) return null;
-        if (fsId.startsWith("/")) return fsId;
-        return "/api/v1/goals/images/" + fsId;
+        String value = fsId.trim();
+        if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) {
+            return value;
+        }
+        return "/api/v1/goals/images/" + value;
+    }
+
+    private String extractGoalImageId(String imageUrl) {
+        String marker = "/goals/images/";
+        int index = imageUrl.indexOf(marker);
+        if (index >= 0) {
+            String id = imageUrl.substring(index + marker.length());
+            int query = id.indexOf('?');
+            if (query >= 0) {
+                id = id.substring(0, query);
+            }
+            int hash = id.indexOf('#');
+            if (hash >= 0) {
+                id = id.substring(0, hash);
+            }
+            return id.isBlank() ? null : id;
+        }
+        if (!imageUrl.contains("/") && !imageUrl.contains("://")) {
+            return imageUrl;
+        }
+        return null;
     }
 }

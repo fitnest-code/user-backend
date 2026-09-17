@@ -2,6 +2,7 @@ package az.fitnest.user.service.impl;
 
 import az.fitnest.user.client.IdentityGrpcClient;
 import az.fitnest.user.client.OrderGrpcClient;
+import az.fitnest.user.client.PaymentCoinGrpcClient;
 import az.fitnest.user.dto.PaginatedResponse;
 import az.fitnest.user.dto.response.AdminUserResponse;
 import az.fitnest.user.dto.response.UserStatisticsResponse;
@@ -32,6 +33,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final az.fitnest.user.repository.GoalReferenceRepository goalReferenceRepository;
     private final az.fitnest.user.client.DevicePlatformGrpcClient devicePlatformGrpcClient;
     private final CatalogGrpcClient catalogGrpcClient;
+    private final PaymentCoinGrpcClient paymentCoinGrpcClient;
 
     private static final java.util.concurrent.ExecutorService grpcExecutor = 
         java.util.concurrent.Executors.newFixedThreadPool(16, new java.util.concurrent.ThreadFactory() {
@@ -92,6 +94,20 @@ public class AdminUserServiceImpl implements AdminUserService {
             bmi = Math.round(bmi * 10.0) / 10.0;
         }
 
+        java.math.BigDecimal coinBalance = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal coinAznEquivalent = java.math.BigDecimal.ZERO;
+        try {
+            PaymentCoinGrpcClient.CoinWalletSnapshot coins = paymentCoinGrpcClient.getCoinWallet(userId);
+            if (coins.coinBalance() != null) {
+                coinBalance = coins.coinBalance();
+            }
+            if (coins.aznEquivalent() != null) {
+                coinAznEquivalent = coins.aznEquivalent();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch coin wallet for user detail {}: {}", userId, e.getMessage());
+        }
+
         return az.fitnest.user.dto.response.AdminUserDetailResponse.builder()
                 .userId(userId)
                 .fullName(fullName.trim())
@@ -105,6 +121,8 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .weight(profile.getWeightKg())
                 .bmiIndex(bmi)
                 .role(role)
+                .coinBalance(coinBalance)
+                .coinAznEquivalent(coinAznEquivalent)
                 .build();
     }
 
