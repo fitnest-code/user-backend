@@ -21,8 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
-
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 
@@ -71,12 +70,46 @@ public class PublicLandingGoalsController {
                 .body(ApiResponse.success(goalReferenceService.getPublicGoalByCode(code, language)));
     }
 
-    @GetMapping(value = "/images/{fsId}", produces = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE, "image/svg+xml"})
+    @GetMapping(value = "/images/{fsId}")
     @SecurityRequirements
     @Operation(summary = "Public goal image", description = "Streams a goal image without authentication.")
-    public ResponseEntity<StreamingResponseBody> streamPublicGoalImage(@PathVariable String fsId) {
+    public ResponseEntity<byte[]> streamPublicGoalImage(@PathVariable String fsId) {
+        byte[] data = goalReferenceService.downloadGoalImage(fsId);
+        if (data == null || data.length == 0) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                .body(goalReferenceService.streamGoalImage(fsId));
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .contentType(detectImageMediaType(data))
+                .body(data);
+    }
+
+    private static MediaType detectImageMediaType(byte[] data) {
+        if (data.length >= 8
+                && data[0] == (byte) 0x89
+                && data[1] == 0x50
+                && data[2] == 0x4E
+                && data[3] == 0x47) {
+            return MediaType.IMAGE_PNG;
+        }
+        if (data.length >= 3
+                && data[0] == (byte) 0xFF
+                && data[1] == (byte) 0xD8
+                && data[2] == (byte) 0xFF) {
+            return MediaType.IMAGE_JPEG;
+        }
+        if (data.length >= 12
+                && data[0] == 0x52
+                && data[1] == 0x49
+                && data[2] == 0x46
+                && data[3] == 0x46) {
+            return MediaType.parseMediaType("image/webp");
+        }
+        String head = new String(data, 0, Math.min(data.length, 256), StandardCharsets.UTF_8).trim();
+        if (head.startsWith("<svg") || head.startsWith("<?xml") || head.contains("<svg")) {
+            return MediaType.parseMediaType("image/svg+xml");
+        }
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 }

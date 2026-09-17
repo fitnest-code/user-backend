@@ -70,19 +70,23 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     @Override
     public StreamingResponseBody streamGoalImage(String fsId) {
         return outputStream -> {
-            storageGrpcClient.downloadFile(fsId, response -> {
-                if (response.hasFileData()) {
-                    try {
-                        outputStream.write(response.getFileData().toByteArray());
-                    } catch (IOException e) {
-                    }
-                }
-            });
-            try {
-                outputStream.flush();
-            } catch (IOException e) {
-            }
+            outputStream.write(downloadGoalImage(fsId));
+            outputStream.flush();
         };
+    }
+
+    @Override
+    public byte[] downloadGoalImage(String fsId) {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        storageGrpcClient.downloadFile(fsId, response -> {
+            if (response.hasFileData()) {
+                try {
+                    buffer.write(response.getFileData().toByteArray());
+                } catch (IOException e) {
+                }
+            }
+        });
+        return buffer.toByteArray();
     }
 
     @Transactional
@@ -302,15 +306,40 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     private String getPublicImageUrl(String imageUrl) {
         String full = getFullImageUrl(imageUrl);
         if (full == null) return null;
-        if (full.startsWith("/api/v1/goals/images/")) {
-            return "/api/v1/public/landing/goals/images/" + full.substring("/api/v1/goals/images/".length());
+        String fileId = extractGoalImageId(full);
+        if (fileId != null) {
+            return "/api/v1/public/landing/goals/images/" + fileId;
         }
         return full;
     }
 
     private String getFullImageUrl(String fsId) {
         if (fsId == null || fsId.trim().isEmpty()) return null;
-        if (fsId.startsWith("/")) return fsId;
-        return "/api/v1/goals/images/" + fsId;
+        String value = fsId.trim();
+        if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) {
+            return value;
+        }
+        return "/api/v1/goals/images/" + value;
+    }
+
+    private String extractGoalImageId(String imageUrl) {
+        String marker = "/goals/images/";
+        int index = imageUrl.indexOf(marker);
+        if (index >= 0) {
+            String id = imageUrl.substring(index + marker.length());
+            int query = id.indexOf('?');
+            if (query >= 0) {
+                id = id.substring(0, query);
+            }
+            int hash = id.indexOf('#');
+            if (hash >= 0) {
+                id = id.substring(0, hash);
+            }
+            return id.isBlank() ? null : id;
+        }
+        if (!imageUrl.contains("/") && !imageUrl.contains("://")) {
+            return imageUrl;
+        }
+        return null;
     }
 }

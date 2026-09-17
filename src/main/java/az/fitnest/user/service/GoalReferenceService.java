@@ -18,6 +18,8 @@ public interface GoalReferenceService {
 
     StreamingResponseBody streamGoalImage(String fsId);
 
+    byte[] downloadGoalImage(String fsId);
+
     GoalReference createGoal(String code, String title, String subtitle, MultipartFile image);
 
     GoalReference updateGoal(String code, String title, String subtitle, MultipartFile image);
