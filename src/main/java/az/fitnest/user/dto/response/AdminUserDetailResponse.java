@@ -2,6 +2,7 @@ package az.fitnest.user.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Builder
@@ -41,5 +42,11 @@ public record AdminUserDetailResponse(
     Double bmiIndex,
 
     @Schema(description = "Rol", example = "ROLE_USER")
-    String role
+    String role,
+
+    @Schema(description = "Coin balansı", example = "320.00")
+    BigDecimal coinBalance,
+
+    @Schema(description = "Coin-in AZN ekvivalenti", example = "32.00")
+    BigDecimal coinAznEquivalent
 ) {}

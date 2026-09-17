@@ -64,7 +64,7 @@ public class AdminUserController {
         return ResponseEntity.ok(adminUserService.getUserStatistics());
     }
 
-    @Operation(summary = "İstifadəçi detallarını gətir", description = "İstifadəçinin bütün detallarını (ad, soyad, qeydiyyat tarixi, platform, telefon, email, boy, çəki, BMI və s.) qaytarır.")
+    @Operation(summary = "İstifadəçi detallarını gətir", description = "İstifadəçinin bütün detallarını (ad, soyad, qeydiyyat tarixi, platform, telefon, email, boy, çəki, BMI, Coin balansı və s.) qaytarır.")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{userId}")
     public ResponseEntity<az.fitnest.user.dto.response.AdminUserDetailResponse> getUserDetail(
