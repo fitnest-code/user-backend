@@ -6,31 +6,13 @@ import az.fitnest.user.repository.TranslationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import org.springframework.scheduling.annotation.Async;
-
 @Service
 public class TranslationService {
 
     private final TranslationRepository translationRepository;
-    private final org.springframework.web.client.RestTemplate restTemplate;
-
-    @jakarta.persistence.PersistenceContext
-    private jakarta.persistence.EntityManager entityManager;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
-    private TranslationService self;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    private TranslationEntityResolver translationEntityResolver;
 
     public TranslationService(TranslationRepository translationRepository) {
         this.translationRepository = translationRepository;
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(1000);
-        factory.setReadTimeout(1500);
-        this.restTemplate = new org.springframework.web.client.RestTemplate(factory);
-        this.restTemplate.getMessageConverters().add(0, new org.springframework.http.converter.StringHttpMessageConverter(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public String getTranslatedValue(String entityType, String entityId, String fieldName, String userLanguage) {
@@ -56,129 +38,23 @@ public class TranslationService {
         }
 
         if (entityType != null && entityType.equalsIgnoreCase("Gender")) {
-            String originalVal = null;
+            // Manual fixed vocabulary: no machine translation.
             if (entityId != null && entityId.equalsIgnoreCase("MALE")) {
-                originalVal = "Kişi";
+                if (userLanguage.equalsIgnoreCase("EN")) return "Male";
+                if (userLanguage.equalsIgnoreCase("RU")) return "Мужчина";
             } else if (entityId != null && entityId.equalsIgnoreCase("FEMALE")) {
-                originalVal = "Qadın";
+                if (userLanguage.equalsIgnoreCase("EN")) return "Female";
+                if (userLanguage.equalsIgnoreCase("RU")) return "Женщина";
             }
-
-            if (originalVal != null) {
-                String translatedValue = translateText(originalVal, userLanguage.toLowerCase());
-                if (translatedValue != null && !translatedValue.trim().isEmpty()) {
-                    self.saveOrUpdateTranslation(entityType, entityId, userLanguage, fieldName, translatedValue);
-                    return translatedValue;
-                }
-            }
+            return null;
         }
 
-        try {
-            Class<?> entityClass = translationEntityResolver.getEntityClass(entityType);
-            if (entityClass != null) {
-                Object entity = entityManager.find(entityClass, entityId);
-                if (entity != null) {
-                    String originalValueAz = translationEntityResolver.extractFieldValue(entity, fieldName);
-                    if (originalValueAz != null && !originalValueAz.trim().isEmpty()) {
-                        String translatedValue = translateText(originalValueAz, userLanguage.toLowerCase());
-                        if (translatedValue != null && !translatedValue.trim().isEmpty()) {
-                            self.saveOrUpdateTranslation(entityType, entityId, userLanguage, fieldName, translatedValue);
-                            return translatedValue;
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Soft fallback translation failed for entityType={}, entityId={}, fieldName={}, lang={}",
-                    entityType, entityId, fieldName, userLanguage, e);
-        }
-
+        // Manual translations only: AZ lives on its own entity table, EN/RU live in
+        // the translations table (admin-provided). No machine translation.
         return null;
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TranslationService.class);
-
-    @Async
-    public void autoTranslateAndSave(String entityType, String entityId, String fieldName, String originalValueAz) {
-        if (entityType != null && (entityType.equalsIgnoreCase("GoalReference") || entityType.equalsIgnoreCase("Goal"))) {
-            return;
-        }
-        if (originalValueAz == null || originalValueAz.trim().isEmpty()) {
-            log.warn("Auto-translation skipped: originalValueAz is null or empty for entityType={}, entityId={}, fieldName={}", 
-                entityType, entityId, fieldName);
-            return;
-        }
-
-        log.info("Starting auto-translation process for entityType={}, entityId={}, fieldName={}, originalValueAz='{}'", 
-            entityType, entityId, fieldName, originalValueAz);
-
-        // Translate to EN
-        String enValue = translateText(originalValueAz, "en");
-        if (enValue != null && !enValue.trim().isEmpty()) {
-            log.info("Auto-translated [AZ -> EN] success. Value: '{}'", enValue);
-            saveOrUpdateTranslation(entityType, entityId, "EN", fieldName, enValue);
-        } else {
-            log.warn("Auto-translation [AZ -> EN] returned empty or null value. Using fallback: '{}'", originalValueAz);
-            saveOrUpdateTranslation(entityType, entityId, "EN", fieldName, originalValueAz);
-        }
-
-        // Translate to RU
-        String ruValue = translateText(originalValueAz, "ru");
-        if (ruValue != null && !ruValue.trim().isEmpty()) {
-            log.info("Auto-translated [AZ -> RU] success. Value: '{}'", ruValue);
-            saveOrUpdateTranslation(entityType, entityId, "RU", fieldName, ruValue);
-        } else {
-            log.warn("Auto-translation [AZ -> RU] returned empty or null value. Using fallback: '{}'", originalValueAz);
-            saveOrUpdateTranslation(entityType, entityId, "RU", fieldName, originalValueAz);
-        }
-    }
-
-    private String translateText(String text, String targetLanguage) {
-        // Try Google Translate (Ultra-accurate, extremely reliable, free, no keys needed)
-        try {
-            String googleTranslated = translateWithGoogle(text, targetLanguage);
-            if (googleTranslated != null && !googleTranslated.trim().isEmpty()) {
-                log.info("Translation successful using Google Translate [AZ -> {}]: '{}' -> '{}'", 
-                    targetLanguage.toUpperCase(), text, googleTranslated);
-                return googleTranslated;
-            }
-        } catch (Exception e) {
-            log.error("Google Translate failed. Error: {}", e.getMessage());
-        }
-        return null;
-    }
-
-    private String translateWithGoogle(String text, String targetLanguage) {
-        try {
-            java.net.URI uri = org.springframework.web.util.UriComponentsBuilder
-                .fromUriString("https://translate.googleapis.com/translate_a/single")
-                .queryParam("client", "gtx")
-                .queryParam("sl", "az")
-                .queryParam("tl", targetLanguage.toLowerCase())
-                .queryParam("dt", "t")
-                .queryParam("q", text)
-                .build()
-                .toUri();
-
-            log.info("Google Translate Request [AZ -> {}]: '{}'", targetLanguage.toUpperCase(), text);
-            String response = restTemplate.getForObject(uri, String.class);
-            if (response != null) {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(response);
-                if (rootNode.isArray() && rootNode.size() > 0) {
-                    com.fasterxml.jackson.databind.JsonNode firstArray = rootNode.get(0);
-                    if (firstArray.isArray() && firstArray.size() > 0) {
-                        com.fasterxml.jackson.databind.JsonNode translationPair = firstArray.get(0);
-                        if (translationPair.isArray() && translationPair.size() > 0) {
-                            return translationPair.get(0).asText();
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Google Translation API failed for text '{}' to '{}': {}", text, targetLanguage, e.getMessage());
-        }
-        return null;
-    }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void saveOrUpdateTranslation(String entityType, String entityId, String languageCode, String fieldName, String fieldValue) {

@@ -109,8 +109,6 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
         goalReferenceRepository.save(goal);
 
-        translationService.autoTranslateAndSave("GoalReference", code, "title", title);
-        translationService.autoTranslateAndSave("GoalReference", code, "subtitle", subtitle);
 
         return goal;
     }
@@ -133,8 +131,6 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
 
         goalReferenceRepository.save(goal);
 
-        translationService.autoTranslateAndSave("GoalReference", code, "title", title);
-        translationService.autoTranslateAndSave("GoalReference", code, "subtitle", subtitle);
 
         return goal;
     }
