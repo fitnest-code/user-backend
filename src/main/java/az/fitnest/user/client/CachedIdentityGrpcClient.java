@@ -3,20 +3,31 @@ package az.fitnest.user.client;
 import az.fitnest.user.dto.response.IdentityUserResponse;
 import az.fitnest.user.grpc.UserResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CachedIdentityGrpcClient {
 
     private final IdentityGrpcClient identityGrpcClient;
 
     @Cacheable(cacheNames = "identity_users", key = "#userId", sync = true)
     public IdentityUserResponse getUserById(Long userId) {
-        UserResponse raw = identityGrpcClient.getUserById(userId);
-        return toDto(raw);
+        try {
+            UserResponse raw = identityGrpcClient.getUserById(userId);
+            return toDto(raw);
+        } catch (Exception e) {
+            // Return minimal DTO instead of throwing - prevents cascade failures
+            log.warn("Failed to fetch user {} from identity-backend: {}", userId, e.getMessage());
+            return IdentityUserResponse.builder()
+                    .userId(userId)
+                    .language("AZ")
+                    .build();
+        }
     }
 
     @CacheEvict(cacheNames = "identity_users", key = "#userId")
