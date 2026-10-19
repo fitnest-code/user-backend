@@ -67,9 +67,11 @@ public class UserProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profil tapılmadı",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
+    // Return bare profile (not ApiResponse) so mobile root-decode always works even if
+    // ApiResponse serializer regresses again.
     @GetMapping("/api/v1/me")
-    public ResponseEntity<ApiResponse<UserProfileResponse>> getMe() {
-        return ResponseEntity.ok(ApiResponse.success(userProfileService.getUserMe()));
+    public ResponseEntity<UserProfileResponse> getMe() {
+        return ResponseEntity.ok(userProfileService.getUserMe());
     }
 
     @Operation(
@@ -92,8 +94,8 @@ public class UserProfileController {
             )
     })
     @GetMapping("/api/v2/me")
-    public ResponseEntity<ApiResponse<UserProfileV2Response>> getMeV2() {
-        return ResponseEntity.ok(ApiResponse.success(userProfileService.getUserMeV2()));
+    public ResponseEntity<UserProfileV2Response> getMeV2() {
+        return ResponseEntity.ok(userProfileService.getUserMeV2());
     }
 
     @Operation(summary = "İstifadəçi profilini yeniləyin", description = "Autentifikasiya olunmuş istifadəçinin ad, soyad, e-poçt və mobil nömrəsini yeniləyir. Yalnız təqdim olunan sahələr yenilənəcək, digərləri dəyişməz qalacaq. Giriş məlumatları üzərində doğrulama aparılır.")
@@ -102,8 +104,8 @@ public class UserProfileController {
                     content = @Content(schema = @Schema(implementation = UserProfileResponse.class), examples = @ExampleObject(value = "{\"user_id\": 1, \"first_name\": \"John\", \"last_name\": \"Doe\", \"email\": \"john.doe@example.com\", \"mobile\": \"+994500000000\", \"profile_image_url\": \"null\", \"current_subscription\": \"Bronze\"}")))
     })
     @PutMapping("/api/v1/me")
-    public ResponseEntity<ApiResponse<UserProfileResponse>> updateMe(@Valid @RequestBody UpdateUserProfileRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(userProfileService.updateUserMe(request)));
+    public ResponseEntity<UserProfileResponse> updateMe(@Valid @RequestBody UpdateUserProfileRequest request) {
+        return ResponseEntity.ok(userProfileService.updateUserMe(request));
     }
 
     @Operation(summary = "İstifadəçi məkanını yeniləyin", description = "İstifadəçinin cari şəhər və ölkəsini yeniləyir.")
