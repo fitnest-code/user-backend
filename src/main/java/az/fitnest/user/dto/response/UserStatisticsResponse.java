@@ -15,6 +15,12 @@ public record UserStatisticsResponse(
     @Schema(description = "Abunəliyi bitmiş istifadəçilərin sayı", example = "200")
     long finishedSubscriptions,
 
-    @Schema(description = "Aktiv və ya dondurulmuş abunəliyi olan istifadəçilərin sayı", example = "750")
+    @Schema(description = "Aktiv abunəliyi olan istifadəçilərin sayı", example = "700")
+    long activeSubscriptions,
+
+    @Schema(description = "Dondurulmuş abunəliyi olan istifadəçilərin sayı", example = "50")
+    long frozenSubscriptions,
+
+    @Schema(description = "Aktiv və ya dondurulmuş abunəliyi olan unikal istifadəçilərin sayı", example = "750")
     long activeOrFrozenSubscriptions
 ) {}
