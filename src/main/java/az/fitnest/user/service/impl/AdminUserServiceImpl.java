@@ -437,7 +437,10 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    @Cacheable(value = "user-statistics", key = "'all'")
+    // The key is versioned because the cached response shape changed when the
+    // active/frozen counts were split. Reusing the old key would deserialize
+    // pre-change Redis entries into the new record, leaving the new fields at 0.
+    @Cacheable(value = "user-statistics", key = "'active-frozen-v2'")
     public UserStatisticsResponse getUserStatistics() {
         long totalUsers = 0;
         List<Long> roleUserIds = List.of();
