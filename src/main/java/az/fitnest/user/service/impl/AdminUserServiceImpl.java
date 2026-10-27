@@ -451,29 +451,77 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         long usersWithLast7Days = 0;
         long finishedSubscriptions = 0;
+        long activeSubscriptions = 0;
+        long frozenSubscriptions = 0;
         long activeOrFrozenSubscriptions = 0;
 
         if (!roleUserIds.isEmpty()) {
-            try {
-                final java.util.Set<Long> roleUserIdSet = new java.util.HashSet<>(roleUserIds);
-                List<Long> last7DaysIds = orderGrpcClient.getFilteredUserIds(null, null, "LAST_7_DAYS", null);
-                List<Long> finishedIds  = orderGrpcClient.getFilteredUserIds(null, null, "FINISHED", null);
-                List<Long> activeIds    = orderGrpcClient.getFilteredUserIds(null, null, "ACTIVE", null);
+            final java.util.Set<Long> roleUserIdSet = new java.util.HashSet<>(roleUserIds);
 
-                usersWithLast7Days          = last7DaysIds.stream().filter(roleUserIdSet::contains).distinct().count();
-                finishedSubscriptions       = finishedIds.stream().filter(roleUserIdSet::contains).distinct().count();
-                activeOrFrozenSubscriptions = activeIds.stream().filter(roleUserIdSet::contains).distinct().count();
-            } catch (Exception e) {
-                log.error("Failed to fetch filtered subscription statistics from order-backend", e);
-            }
+            // The four status lookups are independent: run them concurrently on the shared
+            // gRPC pool. Each future degrades to an empty list on failure, so a single
+            // failing status does not wipe out the remaining statistics.
+            java.util.concurrent.CompletableFuture<List<Long>> last7DaysFuture =
+                    java.util.concurrent.CompletableFuture.supplyAsync(() -> safeFilteredUserIds("LAST_7_DAYS"), grpcExecutor);
+            java.util.concurrent.CompletableFuture<List<Long>> finishedFuture =
+                    java.util.concurrent.CompletableFuture.supplyAsync(() -> safeFilteredUserIds("FINISHED"), grpcExecutor);
+            java.util.concurrent.CompletableFuture<List<Long>> activeFuture =
+                    java.util.concurrent.CompletableFuture.supplyAsync(() -> safeFilteredUserIds("ACTIVE"), grpcExecutor);
+            java.util.concurrent.CompletableFuture<List<Long>> frozenFuture =
+                    java.util.concurrent.CompletableFuture.supplyAsync(() -> safeFilteredUserIds("FROZEN"), grpcExecutor);
+
+            usersWithLast7Days = intersect(last7DaysFuture.join(), roleUserIdSet).size();
+            finishedSubscriptions = intersect(finishedFuture.join(), roleUserIdSet).size();
+
+            final java.util.Set<Long> activeUserIds = intersect(activeFuture.join(), roleUserIdSet);
+            final java.util.Set<Long> frozenUserIds = intersect(frozenFuture.join(), roleUserIdSet);
+            activeSubscriptions = activeUserIds.size();
+            frozenSubscriptions = frozenUserIds.size();
+            activeOrFrozenSubscriptions = unionSize(activeUserIds, frozenUserIds);
         }
 
         return UserStatisticsResponse.builder()
                 .totalUsers(totalUsers)
                 .usersWithLast7Days(usersWithLast7Days)
                 .finishedSubscriptions(finishedSubscriptions)
+                .activeSubscriptions(activeSubscriptions)
+                .frozenSubscriptions(frozenSubscriptions)
                 .activeOrFrozenSubscriptions(activeOrFrozenSubscriptions)
                 .build();
+    }
+
+    /** Fetches filtered user ids, degrading to an empty list instead of failing the whole statistics call. */
+    private List<Long> safeFilteredUserIds(String subscriptionStatus) {
+        try {
+            return orderGrpcClient.getFilteredUserIds(null, null, subscriptionStatus, null);
+        } catch (Exception e) {
+            log.warn("Failed to fetch {} subscription user ids from order-backend", subscriptionStatus, e);
+            return List.of();
+        }
+    }
+
+    /** Distinct ids present in both {@code ids} and {@code allowed}, in O(ids.size()). */
+    private static java.util.Set<Long> intersect(List<Long> ids, java.util.Set<Long> allowed) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptySet();
+        }
+        java.util.Set<Long> matched = new java.util.HashSet<>(ids.size());
+        for (Long id : ids) {
+            if (allowed.contains(id)) {
+                matched.add(id);
+            }
+        }
+        return matched;
+    }
+
+    /** Size of the distinct union of two id sets, in O(a.size() + b.size()). */
+    private static long unionSize(java.util.Set<Long> a, java.util.Set<Long> b) {
+        if (b.isEmpty()) {
+            return a.size();
+        }
+        java.util.Set<Long> union = new java.util.HashSet<>(a);
+        union.addAll(b);
+        return union.size();
     }
 
     private List<UserProfileRepository.UserIdNameProjection> fetchNamesInBatches(List<Long> userIds) {
