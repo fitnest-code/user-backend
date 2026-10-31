@@ -36,7 +36,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     private final StorageGrpcClient storageGrpcClient;
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "goals-all", key = "'goals-all-' + #root.target.resolveRequestLanguage()")
+    @org.springframework.cache.annotation.Cacheable(value = "goals-all", key = "'goals-all-' + #root.target.resolveLanguageForCache()")
     public List<GoalItemResponse> getAllGoals() {
         String userLanguage = getUserLanguage();
         List<GoalReference> goals = goalReferenceRepository.findAllByOrderByGoalCodeAsc();
@@ -44,7 +44,7 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     }
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "goal-by-code", key = "{#code, #root.target.resolveRequestLanguage()}")
+    @org.springframework.cache.annotation.Cacheable(value = "goal-by-code", key = "{#code, #root.target.resolveLanguageForCache()}")
     public GoalItemResponse getGoalByCode(String code) {
         GoalReference goal = goalReferenceRepository.findById(code)
                 .orElseThrow(() -> new ResourceNotFoundException("error.goal_reference_not_found"));
