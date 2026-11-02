@@ -218,7 +218,11 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     }
 
     public String resolveLanguageForCache() {
-        return getUserLanguage();
+        try {
+            return getUserLanguage();
+        } catch (Exception e) {
+            return "AZ";
+        }
     }
 
     private String normalizeLanguage(String value) {
@@ -238,38 +242,43 @@ public class GoalReferenceServiceImpl implements GoalReferenceService {
     }
 
     private String getUserLanguage() {
-        // 1. First check if user is authenticated and get language from their profile (Authorization / JWT)
-        Long userId = UserContext.getCurrentUserId();
-        if (userId != null) {
-            try {
-                String profileLang = cachedIdentityGrpcClient.getUserById(userId).language();
-                if (profileLang != null && !profileLang.trim().isEmpty()) {
-                    return profileLang.toUpperCase();
-                }
-            } catch (Exception e) {
-            }
-        }
-
-        // 2. Fallback to Accept-Language header (unauthenticated / anonymous requests)
         try {
-            org.springframework.web.context.request.RequestAttributes requestAttributes = 
-                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-            if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
-                jakarta.servlet.http.HttpServletRequest request = 
-                        ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
-                String acceptLanguage = request.getHeader("Accept-Language");
-                if (acceptLanguage != null && !acceptLanguage.trim().isEmpty()) {
-                    String localeLang = org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage()
-                            .toUpperCase();
-                    if (localeLang.equals("EN") || localeLang.equals("RU") || localeLang.equals("AZ")) {
-                        return localeLang;
+            // 1. First check if user is authenticated and get language from their profile (Authorization / JWT)
+            Long userId = UserContext.getCurrentUserId();
+            if (userId != null) {
+                try {
+                    String profileLang = cachedIdentityGrpcClient.getUserById(userId).language();
+                    if (profileLang != null && !profileLang.trim().isEmpty()) {
+                        return profileLang.toUpperCase();
+                    }
+                } catch (Exception e) {
+                    // Ignore gRPC failures, fall through to header-based resolution
+                }
+            }
+
+            // 2. Fallback to Accept-Language header (unauthenticated / anonymous requests)
+            try {
+                org.springframework.web.context.request.RequestAttributes requestAttributes = 
+                        org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+                if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
+                    jakarta.servlet.http.HttpServletRequest request = 
+                            ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
+                    String acceptLanguage = request.getHeader("Accept-Language");
+                    if (acceptLanguage != null && !acceptLanguage.trim().isEmpty()) {
+                        String localeLang = org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage()
+                                .toUpperCase();
+                        if (localeLang.equals("EN") || localeLang.equals("RU") || localeLang.equals("AZ")) {
+                            return localeLang;
+                        }
                     }
                 }
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
-        }
 
-        return "AZ";
+            return "AZ";
+        } catch (Exception e) {
+            return "AZ";
+        }
     }
 
     private String resolveRequestLanguage() {

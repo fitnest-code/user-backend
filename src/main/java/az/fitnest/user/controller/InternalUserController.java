@@ -1,6 +1,7 @@
 package az.fitnest.user.controller;
 
 import az.fitnest.user.dto.request.InternalUserBatchRequest;
+import az.fitnest.user.dto.response.InternalUserPageResponse;
 import az.fitnest.user.dto.response.InternalUserSummary;
 import az.fitnest.user.service.InternalUserDirectoryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +35,16 @@ public class InternalUserController {
     @PostMapping("/batch")
     public ResponseEntity<List<InternalUserSummary>> getUsers(@Valid @RequestBody InternalUserBatchRequest request) {
         return ResponseEntity.ok(internalUserDirectoryService.getUsers(request.userIds()));
+    }
+
+    @Operation(summary = "Mobil prefiks üzrə istifadəçilər",
+            description = "Telefonu verilən iki rəqəmli prefikslə başlayan istifadəçiləri səhifələyir (silinmişlər istisna).")
+    @GetMapping("/by-prefix")
+    public ResponseEntity<InternalUserPageResponse> getUsersByPrefix(
+            @RequestParam String prefix,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "200") int size) {
+        return ResponseEntity.ok(internalUserDirectoryService.getUsersByMobilePrefix(prefix, page, size));
     }
 
     @Operation(summary = "İstifadəçi axtarışı", description = "ID, ad, soyad, e-poçt və ya telefon üzrə uyğun userId-ləri qaytarır.")
