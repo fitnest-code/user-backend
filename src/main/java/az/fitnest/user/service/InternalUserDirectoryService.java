@@ -1,5 +1,6 @@
 package az.fitnest.user.service;
 
+import az.fitnest.user.dto.response.InternalUserPageResponse;
 import az.fitnest.user.dto.response.InternalUserSummary;
 
 import java.util.Collection;
@@ -20,4 +21,10 @@ public interface InternalUserDirectoryService {
      * Resolve ids matching a free-text query (id, name, email, mobile).
      */
     List<Long> searchUserIds(String query, int limit);
+
+    /**
+     * Page through accounts whose mobile starts with the given two-digit national
+     * prefix (the part after +994, e.g. "55"). Deleted accounts are excluded.
+     */
+    InternalUserPageResponse getUsersByMobilePrefix(String prefix, int page, int size);
 }
