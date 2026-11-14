@@ -23,6 +23,24 @@ service UserService {
   rpc SearchUserIdsByMobile(SearchUserIdsByMobileRequest) returns (SearchUserIdsByMobileResponse);
   rpc GetUsersByIds(GetUsersByIdsRequest) returns (GetUsersByIdsResponse);
   rpc GetUserIdsByRoles(GetUserIdsByRolesRequest) returns (GetUserIdsByRolesResponse);
+  rpc ListUsersByMobilePrefix(ListUsersByMobilePrefixRequest) returns (ListUsersByMobilePrefixResponse);
+}
+
+message ListUsersByMobilePrefixRequest {
+  // National significant prefix after +994, e.g. "55" or "99".
+  string prefix = 1;
+  // Zero-based page index.
+  int32 page = 2;
+  int32 size = 3;
+}
+
+message ListUsersByMobilePrefixResponse {
+  repeated UserResponse users = 1;
+  int32 page = 2;
+  int32 size = 3;
+  int64 total_elements = 4;
+  int32 total_pages = 5;
+  bool has_next = 6;
 }
 
 message GetUsersByIdsRequest {
