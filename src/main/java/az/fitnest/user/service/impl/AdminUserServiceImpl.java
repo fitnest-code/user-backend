@@ -493,6 +493,12 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .build();
     }
 
+    @Override
+    @CacheEvict(value = {"user-statistics", "admin-users"}, allEntries = true)
+    public void invalidateListCaches() {
+        log.info("Invalidated admin user-statistics and admin-users caches");
+    }
+
     /** Fetches filtered user ids, degrading to an empty list instead of failing the whole statistics call. */
     private List<Long> safeFilteredUserIds(String subscriptionStatus) {
         try {

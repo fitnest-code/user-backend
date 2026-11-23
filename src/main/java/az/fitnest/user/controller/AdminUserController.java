@@ -57,10 +57,14 @@ public class AdminUserController {
                 subscriptionStatus, sort, search, roles));
     }
 
-    @Operation(summary = "İstifadəçi statistikasını gətir", description = "Ümumi istifadəçi, aktiv/dondurulmuş, bitmiş və tezliklə bitəcək abunəliklərin sayını qaytarır.")
+    @Operation(summary = "İstifadəçi statistikasını gətir", description = "Ümumi istifadəçi, aktiv/dondurulmuş, bitmiş və tezliklə bitəcək abunəliklərin sayını qaytarır. refresh=true köhnə cache-i silir (freeze sonrası).")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/statistics")
-    public ResponseEntity<UserStatisticsResponse> getUserStatistics() {
+    public ResponseEntity<UserStatisticsResponse> getUserStatistics(
+            @Parameter(description = "true olduqda statistika/list cache-i təmizlənir") @RequestParam(defaultValue = "false") boolean refresh) {
+        if (refresh) {
+            adminUserService.invalidateListCaches();
+        }
         return ResponseEntity.ok(adminUserService.getUserStatistics());
     }
 
