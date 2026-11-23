@@ -27,10 +27,12 @@ public class CacheConfig {
                         Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).maximumSize(100).build()),
                 new org.springframework.cache.caffeine.CaffeineCache("dashboard-growth",
                         Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).maximumSize(100).build()),
+                // Short TTL: freeze/unfreeze (order-backend) does not evict this cache, so a long
+                // window left "Dondurulmuş Status" stuck at a stale 0 after admin freezes someone.
                 new org.springframework.cache.caffeine.CaffeineCache("admin-users",
-                        Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(200).build()),
+                        Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.SECONDS).maximumSize(200).build()),
                 new org.springframework.cache.caffeine.CaffeineCache("user-statistics",
-                        Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).maximumSize(10).build()),
+                        Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.SECONDS).maximumSize(10).build()),
                 new org.springframework.cache.caffeine.CaffeineCache("identity_users",
                         Caffeine.newBuilder().expireAfterWrite(15, TimeUnit.MINUTES).maximumSize(5000).build()),
                 new org.springframework.cache.caffeine.CaffeineCache("user_summaries",
