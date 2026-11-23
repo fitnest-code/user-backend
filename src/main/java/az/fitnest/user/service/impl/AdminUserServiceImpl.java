@@ -127,7 +127,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     // Caching strategy note: Use a short TTL (2-5 minutes) for admin-users cache in your cache configuration (e.g., Redis, Ehcache).
-    // For statistics, prefer a scheduled refresh (every 10 minutes) and return cached value immediately.
+    // Cached in Caffeine (user-statistics); invalidated on freeze/lifecycle Kafka events.
     @Override
     @Cacheable(value = "admin-users", key = "{#pageable.pageNumber, #pageable.pageSize, #packageId, #packageDuration, #subscriptionStatus, #sort, #search, #roles}")
     public PaginatedResponse<AdminUserResponse> getAllUsers(Pageable pageable, Long packageId, Integer packageDuration, String subscriptionStatus, String sort, String search, List<String> roles) {
