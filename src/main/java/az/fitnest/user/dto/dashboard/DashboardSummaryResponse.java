@@ -29,7 +29,10 @@ public record DashboardSummaryResponse(
             double marginPct,
             double refundAmount,
             double pendingBnplAmount,
-            List<DashboardGymRow> obligationGyms
+            List<DashboardGymRow> obligationGyms,
+            List<Double> incomeSparkline,
+            List<Double> obligationSparkline,
+            List<Double> netSparkline
     ) {}
 
     public record DashboardGymRow(Long gymId, String gymName, long qrCount, double amount) {}
@@ -52,7 +55,8 @@ public record DashboardSummaryResponse(
             long endedInPeriod,
             long renewedInPeriod,
             Double activeDeltaPct,
-            boolean activePositiveTrend
+            boolean activePositiveTrend,
+            List<Double> sparkline
     ) {}
 
     public record DashboardPackageCardBlock(
@@ -72,7 +76,8 @@ public record DashboardSummaryResponse(
             long lightScans,
             Double lightDeltaPct,
             long darkScans,
-            Double darkDeltaPct
+            Double darkDeltaPct,
+            List<Double> sparkline
     ) {}
 
     public record DashboardTopGymBlock(
