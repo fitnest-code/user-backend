@@ -25,10 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Dashboard Admin",
-        description = "Dashboard statistikaları və analitik məlumatlar üçün administrativ endpoint-lər. Bu endpoint-lər yalnız SUPER_ADMIN və OWNER rollarına malik istifadəçilər tərəfindən istifadə edilə bilər."
+        description = "Dashboard statistikaları və analitik məlumatlar. ADMIN / SUPER_ADMIN / OWNER."
 )
 @SecurityRequirement(name = "bearerAuth")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'OWNER')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'OWNER')")
 public class DashboardController {
 
     private final DashboardService dashboardService;
