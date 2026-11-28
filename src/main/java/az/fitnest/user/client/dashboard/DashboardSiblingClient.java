@@ -85,6 +85,11 @@ public class DashboardSiblingClient {
         }
     }
 
+    /** Daily QR entrance sparkline (replaces qr-scans totals for dashboard V2 cards). */
+    public Map<String, Object> fetchQrSparkline(LocalDate dateFrom, LocalDate dateTo) {
+        return get(catalogDashboardRestClient, "/api/v1/admin/dashboard/qr-sparkline", dateFrom, dateTo, null);
+    }
+
     public List<Map<String, Object>> fetchHomeGymCounts() {
         try {
             List<Map<String, Object>> body = orderDashboardRestClient.get()

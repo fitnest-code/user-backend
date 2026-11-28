@@ -44,7 +44,7 @@ public class AdminDashboardV2Service {
         Map<String, Object> obligationsRaw = Map.of();
         Map<String, Object> subscriptionsRaw = Map.of();
         Map<String, Object> topGymsRaw = Map.of();
-        Map<String, Object> qrScansRaw = Map.of();
+        Map<String, Object> qrSparklineRaw = Map.of();
         Map<String, Object> appQrRaw = Map.of();
         List<Map<String, Object>> homeGymRaw = List.of();
 
@@ -73,9 +73,9 @@ public class AdminDashboardV2Service {
             blockErrors.add("topGyms");
         }
         try {
-            qrScansRaw = siblingClient.fetchQrScans(from, to);
+            qrSparklineRaw = siblingClient.fetchQrSparkline(from, to);
         } catch (Exception e) {
-            log.warn("dashboard qr-scans failed: {}", e.getMessage());
+            log.warn("dashboard qr-sparkline failed: {}", e.getMessage());
             blockErrors.add("qrScans");
         }
         try {
@@ -95,7 +95,7 @@ public class AdminDashboardV2Service {
         DashboardCustomersBlock customers = buildCustomers(blockErrors);
         DashboardSubscriptionsBlock subscriptions = mapSubscriptions(subscriptionsRaw);
         List<DashboardPackageCardBlock> packageCards = mapPackageCards(subscriptionsRaw);
-        DashboardQrBlock qr = buildQr(qrScansRaw, appQrRaw);
+        DashboardQrBlock qr = buildQr(qrSparklineRaw, appQrRaw);
         List<DashboardTopGymBlock> topGyms = mapTopGyms(topGymsRaw, homeGymRaw);
 
         return new DashboardSummaryResponse(
@@ -129,6 +129,10 @@ public class AdminDashboardV2Service {
                         asDouble(g.get("amount"))))
                 .toList();
 
+        List<Double> incomeSpark = asDoubleList(income.get("sparkline"));
+        List<Double> obligationSpark = asDoubleList(obligations.get("sparkline"));
+        List<Double> netSpark = zipNet(incomeSpark, obligationSpark);
+
         double net = totalIncome - totalObligation;
         double margin = totalIncome > 0 ? (net * 100.0) / totalIncome : 0.0;
         // Obligation / net period deltas are not yet tracked separately — reuse income trend for net.
@@ -145,7 +149,10 @@ public class AdminDashboardV2Service {
                 Math.round(margin * 10.0) / 10.0,
                 refund,
                 bnpl,
-                rows
+                rows,
+                incomeSpark,
+                obligationSpark,
+                netSpark
         );
     }
 
@@ -169,7 +176,6 @@ public class AdminDashboardV2Service {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static DashboardSubscriptionsBlock mapSubscriptions(Map<String, Object> raw) {
         return new DashboardSubscriptionsBlock(
                 asLong(raw.get("last7DaysCount")),
@@ -178,7 +184,8 @@ public class AdminDashboardV2Service {
                 asLong(raw.get("endedInPeriod")),
                 asLong(raw.get("renewedInPeriod")),
                 asDoubleObj(raw.get("activeDeltaPct")),
-                asBoolean(raw.get("activePositiveTrend"))
+                asBoolean(raw.get("activePositiveTrend")),
+                asDoubleList(raw.get("sparkline"))
         );
     }
 
@@ -200,12 +207,16 @@ public class AdminDashboardV2Service {
     }
 
     private static DashboardQrBlock buildQr(Map<String, Object> entrance, Map<String, Object> appQr) {
-        long total = asLong(entrance.get("count"));
+        long total = asLong(entrance.get("totalScans"));
+        if (total == 0L && entrance.containsKey("count")) {
+            // Fallback if an older qr-scans shape is still used somewhere.
+            total = asLong(entrance.get("count"));
+        }
         Double totalDelta = asDoubleObj(entrance.get("percentageChange"));
         long light = asLong(appQr.get("lightCount"));
         long dark = asLong(appQr.get("darkCount"));
-        // App QR report has no period delta today.
-        return new DashboardQrBlock(total, totalDelta, light, null, dark, null);
+        return new DashboardQrBlock(
+                total, totalDelta, light, null, dark, null, asDoubleList(entrance.get("sparkline")));
     }
 
     @SuppressWarnings("unchecked")
@@ -232,6 +243,32 @@ public class AdminDashboardV2Service {
                     );
                 })
                 .toList();
+    }
+
+    private static List<Double> zipNet(List<Double> income, List<Double> obligation) {
+        int n = Math.max(income.size(), obligation.size());
+        if (n == 0) {
+            return List.of();
+        }
+        List<Double> net = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            double inc = i < income.size() ? income.get(i) : 0.0;
+            double obl = i < obligation.size() ? obligation.get(i) : 0.0;
+            net.add(inc - obl);
+        }
+        return net;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Double> asDoubleList(Object v) {
+        if (!(v instanceof List<?> list) || list.isEmpty()) {
+            return List.of();
+        }
+        List<Double> out = new ArrayList<>(list.size());
+        for (Object item : list) {
+            out.add(item instanceof Number n ? n.doubleValue() : 0.0);
+        }
+        return out;
     }
 
     private static LocalDate[] resolveRange(LocalDate dateFrom, LocalDate dateTo) {
