@@ -50,6 +50,55 @@ public class DashboardSiblingClient {
         return get(orderDashboardRestClient, "/api/v1/admin/dashboard/subscriptions/summary", dateFrom, dateTo, null);
     }
 
+    public Map<String, Object> fetchAppQrReport() {
+        try {
+            Map<String, Object> body = catalogDashboardRestClient.get()
+                    .uri("/api/v1/admin/reports/app-qr-scans")
+                    .headers(this::copyIdentityHeaders)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return body != null ? body : Collections.emptyMap();
+        } catch (Exception e) {
+            throw new SiblingCallException("/api/v1/admin/reports/app-qr-scans", e);
+        }
+    }
+
+    public Map<String, Object> fetchQrScans(LocalDate dateFrom, LocalDate dateTo) {
+        try {
+            Map<String, Object> body = catalogDashboardRestClient.get()
+                    .uri(uriBuilder -> {
+                        var b = uriBuilder.path("/api/v1/admin/reports/qr-scans");
+                        if (dateFrom != null) {
+                            b = b.queryParam("startDate", dateFrom.atStartOfDay().toString());
+                        }
+                        if (dateTo != null) {
+                            b = b.queryParam("endDate", dateTo.atTime(23, 59, 59).toString());
+                        }
+                        return b.build();
+                    })
+                    .headers(this::copyIdentityHeaders)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return body != null ? body : Collections.emptyMap();
+        } catch (Exception e) {
+            throw new SiblingCallException("/api/v1/admin/reports/qr-scans", e);
+        }
+    }
+
+    public List<Map<String, Object>> fetchHomeGymCounts() {
+        try {
+            List<Map<String, Object>> body = orderDashboardRestClient.get()
+                    .uri("/api/v1/admin/dashboard/home-gym-counts")
+                    .headers(this::copyIdentityHeaders)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            return body != null ? body : List.of();
+        } catch (Exception e) {
+            log.warn("Dashboard home-gym-counts call failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     public List<Map<String, Object>> fetchPurchaseDates(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return List.of();
