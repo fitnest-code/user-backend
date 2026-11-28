@@ -145,6 +145,13 @@ identity:
   backend:
     url: ${IDENTITY_BACKEND_URL:http://identity-backend:8080}
 
+# Sibling HTTP bases for Admin Dashboard V2 BFF (cluster DNS defaults).
+fitnest:
+  services:
+    payment-base-url: ${PAYMENT_BACKEND_URL:http://payment-backend:8080}
+    catalog-base-url: ${CATALOG_BACKEND_URL:http://catalog-backend:8080}
+    order-base-url: ${ORDER_BACKEND_URL:http://order-backend:8080}
+
 management:
   endpoints:
     web:
