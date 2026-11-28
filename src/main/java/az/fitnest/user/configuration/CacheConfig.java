@@ -40,7 +40,12 @@ public class CacheConfig {
                 new org.springframework.cache.caffeine.CaffeineCache("user_me",
                         Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(5000).build()),
                 new org.springframework.cache.caffeine.CaffeineCache("languages",
-                        Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).maximumSize(100).build())
+                        Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).maximumSize(100).build()),
+                // Dashboard V2 parallel APIs — short TTL; block failures are soft (blockErrors).
+                new org.springframework.cache.caffeine.CaffeineCache("dashboard-v2-summary",
+                        Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(200).build()),
+                new org.springframework.cache.caffeine.CaffeineCache("dashboard-v2-customers",
+                        Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumSize(200).build())
         ));
         return manager;
     }
